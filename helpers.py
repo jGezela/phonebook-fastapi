@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from models import Contact, Address
-from schemas import ContactCreate
+from schemas import ContactCreate, ContactUpdate
 
 
 def db_get_contacts(session: Session, offset: int = 0, limit: int = 100) -> list[Contact]:
@@ -62,3 +62,35 @@ def db_delete_contact(phone: str, session: Session) -> Contact:
     session.delete(db_contact)
     session.commit()
     return db_contact
+
+
+def db_update_contact(phone: str, contact: ContactUpdate, session: Session) -> Contact:
+    try:
+
+        db_contact = session.query(Contact).outerjoin(
+            Contact.address).filter(Contact.phone == phone).first()
+
+        if not db_contact:
+            return None
+
+        updated_data = contact.model_dump(exclude_unset=True)
+
+        if "address" in updated_data:
+            updated_address = updated_data.pop("address")
+            if db_contact.address:
+                for key, value in updated_address.items():
+                    setattr(db_contact.address, key, value)
+            else:
+                new_address = Address(
+                    **updated_address, contact_id=db_contact.id)
+                session.add(new_address)
+
+        for key, value in updated_data.items():
+            setattr(db_contact, key, value)
+
+        session.commit()
+        session.refresh(db_contact)
+        return db_contact
+    except SQLAlchemyError:
+        session.rollback()
+        raise

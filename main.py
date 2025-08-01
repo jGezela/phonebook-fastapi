@@ -6,9 +6,9 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import FastAPI, Depends, HTTPException
 
 from database import engine, get_session
-from helpers import db_create_contact, db_delete_contact, db_get_contact_by_phone, db_get_contacts, db_get_contacts_by_name
+from helpers import db_create_contact, db_delete_contact, db_get_contact_by_phone, db_get_contacts, db_get_contacts_by_name, db_update_contact
 from models import Base
-from schemas import Contact, ContactCreate
+from schemas import Contact, ContactCreate, ContactUpdate
 
 
 def create_db_and_tables():
@@ -63,4 +63,16 @@ def delete_contact(phone: str, session: SessionDep) -> Contact:
     return deleted_contact
 
 
-@app.patch("")
+@app.patch("/contact/{phone}")
+def update_contact(phone: str, contact: ContactUpdate, session: SessionDep) -> Contact:
+    try:
+        updated_contact = db_update_contact(phone, contact, session)
+
+        if not updated_contact:
+            raise HTTPException(
+                status_code=404, detail="Contact with this phone number does not exists in the database.")
+
+        return updated_contact
+    except IndexError:
+        raise HTTPException(
+            status_code=409, detail="Contact with this phone number already exists in the database.")
